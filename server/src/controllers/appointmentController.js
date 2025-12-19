@@ -3,6 +3,7 @@ const { Appointment, Patient, User } = require('../models');
 exports.getAllAppointments = async (req, res) => {
     try {
         const appointments = await Appointment.findAll({
+            where: { doctorId: req.user.id }, // Filter by current doctor
             include: [
                 { model: Patient, attributes: ['firstName', 'lastName'] },
                 { model: User, as: 'doctor', attributes: ['fullName'] }

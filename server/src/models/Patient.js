@@ -7,6 +7,14 @@ const Patient = sequelize.define('Patient', {
         autoIncrement: true,
         primaryKey: true
     },
+    doctorId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'Users',
+            key: 'id'
+        }
+    },
     firstName: {
         type: DataTypes.STRING,
         allowNull: false
@@ -37,14 +45,6 @@ const Patient = sequelize.define('Patient', {
     },
     emergencyContact: {
         type: DataTypes.STRING
-    },
-    doctorId: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-            model: 'Users',
-            key: 'id'
-        }
     }
 });
 

@@ -7,6 +7,14 @@ const MedicalRecord = sequelize.define('MedicalRecord', {
         autoIncrement: true,
         primaryKey: true
     },
+    doctorId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'Users',
+            key: 'id'
+        }
+    },
     diagnosis: {
         type: DataTypes.TEXT,
         allowNull: false

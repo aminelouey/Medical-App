@@ -3,20 +3,21 @@ const { Op } = require('sequelize');
 
 exports.getStats = async (req, res) => {
     try {
-        // Statistiques globales du cabinet
-        const patientCount = await Patient.count();
-        const appointmentCount = await Appointment.count();
+        const doctorId = req.user.id;
 
-        // Compte les médecins
-        const doctorCount = await User.count({
-            where: {
-                role: {
-                    [Op.in]: ['admin', 'doctor']
-                }
-            }
+        // Statistiques du médecin connecté
+        const patientCount = await Patient.count({
+            where: { doctorId: doctorId }
         });
 
-        // Rendez-vous aujourd'hui (par statut)
+        const appointmentCount = await Appointment.count({
+            where: { doctorId: doctorId }
+        });
+
+        // Compte uniquement ce médecin
+        const doctorCount = 1;
+
+        // Rendez-vous aujourd'hui (par statut) - du médecin connecté
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date();
@@ -24,6 +25,7 @@ exports.getStats = async (req, res) => {
 
         const todayAppointments = await Appointment.count({
             where: {
+                doctorId: doctorId,
                 date: {
                     [Op.gte]: startOfDay,
                     [Op.lte]: endOfDay
@@ -31,9 +33,10 @@ exports.getStats = async (req, res) => {
             }
         });
 
-        // Rendez-vous terminés aujourd'hui
+        // Rendez-vous terminés aujourd'hui - du médecin connecté
         const todayCompleted = await Appointment.count({
             where: {
+                doctorId: doctorId,
                 date: {
                     [Op.gte]: startOfDay,
                     [Op.lte]: endOfDay
@@ -42,9 +45,10 @@ exports.getStats = async (req, res) => {
             }
         });
 
-        // Rendez-vous annulés aujourd'hui
+        // Rendez-vous annulés aujourd'hui - du médecin connecté
         const todayCancelled = await Appointment.count({
             where: {
+                doctorId: doctorId,
                 date: {
                     [Op.gte]: startOfDay,
                     [Op.lte]: endOfDay
@@ -53,14 +57,20 @@ exports.getStats = async (req, res) => {
             }
         });
 
-        // Total rendez-vous terminés (tous)
+        // Total rendez-vous terminés (tous) - du médecin connecté
         const completedTotal = await Appointment.count({
-            where: { status: 'completed' }
+            where: {
+                doctorId: doctorId,
+                status: 'completed'
+            }
         });
 
-        // Total rendez-vous annulés (tous)
+        // Total rendez-vous annulés (tous) - du médecin connecté
         const cancelledTotal = await Appointment.count({
-            where: { status: 'cancelled' }
+            where: {
+                doctorId: doctorId,
+                status: 'cancelled'
+            }
         });
 
         res.json({
@@ -83,6 +93,7 @@ exports.getStats = async (req, res) => {
 exports.getPeriodStats = async (req, res) => {
     try {
         const { period } = req.query; // 'week' or 'month'
+        const doctorId = req.user.id;
 
         const now = new Date();
         let startDate = new Date();
@@ -99,9 +110,10 @@ exports.getPeriodStats = async (req, res) => {
         const endDate = new Date();
         endDate.setHours(23, 59, 59, 999);
 
-        // Count new patients in period
+        // Count new patients in period - for this doctor
         const newPatients = await Patient.count({
             where: {
+                doctorId: doctorId,
                 createdAt: {
                     [Op.gte]: startDate,
                     [Op.lte]: endDate
@@ -109,9 +121,10 @@ exports.getPeriodStats = async (req, res) => {
             }
         });
 
-        // Count appointments in period
+        // Count appointments in period - for this doctor
         const periodAppointments = await Appointment.count({
             where: {
+                doctorId: doctorId,
                 date: {
                     [Op.gte]: startDate,
                     [Op.lte]: endDate
@@ -119,21 +132,23 @@ exports.getPeriodStats = async (req, res) => {
             }
         });
 
-        // Count completed appointments (ALL, not just in period)
+        // Count completed appointments (ALL, not just in period) - for this doctor
         const completedAppointments = await Appointment.count({
             where: {
+                doctorId: doctorId,
                 status: 'completed'
             }
         });
 
-        // Count cancelled appointments (ALL, not just in period)
+        // Count cancelled appointments (ALL, not just in period) - for this doctor
         const cancelledAppointments = await Appointment.count({
             where: {
+                doctorId: doctorId,
                 status: 'cancelled'
             }
         });
 
-        // Calculate trend (compare with previous period)
+        // Calculate trend (compare with previous period) - for this doctor
         let previousStartDate = new Date(startDate);
         if (period === 'week') {
             previousStartDate.setDate(previousStartDate.getDate() - 7);
@@ -143,6 +158,7 @@ exports.getPeriodStats = async (req, res) => {
 
         const previousPatients = await Patient.count({
             where: {
+                doctorId: doctorId,
                 createdAt: {
                     [Op.gte]: previousStartDate,
                     [Op.lt]: startDate
@@ -159,7 +175,7 @@ exports.getPeriodStats = async (req, res) => {
             appointments: periodAppointments,
             completed: completedAppointments,
             cancelled: cancelledAppointments,
-            trend: trend >= 0 ? `+${trend}%` : `${trend}%`
+            trend: trend >= 0 ? `+ ${trend}% ` : `${trend}% `
         });
     } catch (error) {
         console.error('Period stats error:', error);
@@ -171,6 +187,7 @@ exports.getPeriodStats = async (req, res) => {
 exports.getChartData = async (req, res) => {
     try {
         const { period } = req.query; // 'week' or 'month'
+        const doctorId = req.user.id;
 
         if (period === 'week') {
             // Generate data for last 7 days
@@ -185,6 +202,7 @@ exports.getChartData = async (req, res) => {
 
                 const patientsCount = await Patient.count({
                     where: {
+                        doctorId: doctorId,
                         createdAt: {
                             [Op.gte]: startOfDay,
                             [Op.lte]: endOfDay
@@ -194,6 +212,7 @@ exports.getChartData = async (req, res) => {
 
                 const appointmentsCount = await Appointment.count({
                     where: {
+                        doctorId: doctorId,
                         date: {
                             [Op.gte]: startOfDay,
                             [Op.lte]: endOfDay
@@ -224,6 +243,7 @@ exports.getChartData = async (req, res) => {
 
                 const patientsCount = await Patient.count({
                     where: {
+                        doctorId: doctorId,
                         createdAt: {
                             [Op.gte]: startDate,
                             [Op.lte]: endDate
@@ -233,6 +253,7 @@ exports.getChartData = async (req, res) => {
 
                 const appointmentsCount = await Appointment.count({
                     where: {
+                        doctorId: doctorId,
                         date: {
                             [Op.gte]: startDate,
                             [Op.lte]: endDate
@@ -241,7 +262,7 @@ exports.getChartData = async (req, res) => {
                 });
 
                 chartData.push({
-                    label: `Sem ${4 - i}`,
+                    label: `Sem ${4 - i} `,
                     patients: patientsCount,
                     appointments: appointmentsCount
                 });
